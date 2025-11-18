@@ -34,6 +34,8 @@ local.properties
 *.keystore
 !debug.keystore
 .kotlin/
+/.gradle
+/android/app/build/
 
 # node.js
 #
@@ -73,3 +75,19 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+
+.tmp/
+.watchmanconfig
+*.log
+logs/
+
+
+# Android signing keys (never commit)
+android/app/*.keystore
+android/app/*.jks
+android/app/release.keystore
+android/app/upload-keystore.jks
+android/app/build/outputs/
+*.apk
+*.aab
