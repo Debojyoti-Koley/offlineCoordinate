@@ -28,7 +28,7 @@ function App() {
 
   useEffect(() => {
     getCurrentLocation();
-    const interval = setInterval(() => getCurrentLocation(), 1000);
+    const interval = setInterval(() => getCurrentLocation(), 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -42,10 +42,14 @@ function App() {
     }
     if (!previous) {
       console.log('Previous location is null');
+      prevLocationRef.current = current;
+      return;
     }
     if (!current || !previous) return;
 
     const timeDiff = (current.time - previous.time) / 1000;
+    console.log('Current time:', current.time);
+    console.log('Previous time:', previous.time);
     console.log('prevtime diff:', timeDiff);
     if (timeDiff <= 0) return;
 
@@ -130,7 +134,13 @@ function App() {
         prevLocationRef.current = currentLocation;
       }
 
-      setCurrentLocation(location);
+      setCurrentLocation(prev => {
+        if (prev) {
+          // this is the real previous location
+          prevLocationRef.current = prev;
+        }
+        return location; // new currentLocation
+      });
     } catch (error) {
       if (isLocationError(error)) {
         console.warn('Location error', error.code, error.message);
@@ -184,7 +194,7 @@ function App() {
           </View>
           <View style={styles.coordinateStyle}>
             <Text style={styles.SubHeaderTextStyle}>Calculated Speed (km/h)</Text>
-            <Text style={styles.textStyle}>{(calculatedSpeed * 3.6).toFixed(2)}</Text>
+            <Text style={styles.textStyle}>{Math.floor(calculatedSpeed * 3.6)}</Text>
           </View>
         </View>
 
@@ -238,3 +248,4 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+
