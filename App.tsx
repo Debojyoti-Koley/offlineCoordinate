@@ -1,47 +1,80 @@
-import { StatusBar, StyleSheet, useColorScheme, View, Text, Button, Platform, PermissionsAndroid, Alert } from 'react-native';
-import {
-  SafeAreaProvider,
-} from 'react-native-safe-area-context';
-import React, { useState, useEffect, useRef, use } from 'react';
-import GetLocation, {
-  Location,
-  isLocationError,
-} from 'react-native-get-location'
+import { StatusBar, StyleSheet, useColorScheme, View, Text, Platform, PermissionsAndroid, Alert } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef } from 'react';
+import GetLocation, { Location, isLocationError } from 'react-native-get-location';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [previousLocation, setPreviousLocation] = useState<Location | null>(null);
-  const [speed, setSpeed] = useState<number | null>(null);
-  const [acceleration, setAcceleration] = useState<number | null>(null);
+  const [speed, setSpeed] = useState<number>(0);              // m/s
+  const [acceleration, setAcceleration] = useState<number>(0); // m/s²
+  const [altitude, setAltitude] = useState<number | null>(null);
+  const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
+  const [calculatedSpeed, setCalculatedSpeed] = useState<number>(0); // m/s
   const requestingRef = useRef(false);
+  const prevSpeedRef = useRef(0);
 
   useEffect(() => {
     getCurrentLocation();
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 1000)
+    const interval = setInterval(() => getCurrentLocation(), 1000);
     return () => clearInterval(interval);
   }, []);
+
   useEffect(() => {
-    if (currentLocation && previousLocation) {
-      const distance = calculateDistannce(previousLocation.latitude, previousLocation.longitude, currentLocation.latitude, currentLocation.longitude);
-      const timeDiff = (currentLocation.time - previousLocation.time) / 1000; // in seconds
-      if (timeDiff > 0) {
-        const speedValue = distance / timeDiff; // in m/s
-        const acc = speedValue / timeDiff; // in m/s²
-        setAcceleration(acc);
-        setSpeed(speedValue);
-      }
+    console.log('New location received');
+    if (!currentLocation) {
+      console.log('Current location is null');
     }
-    if (currentLocation) {
-      setPreviousLocation(currentLocation);
+    if (!previousLocation) {
+      console.log('Previous location is null');
     }
+    if (!currentLocation || !previousLocation) return;
+
+    const timeDiff = (currentLocation.time - previousLocation.time) / 1000;
+    console.log('prevtime diff:', timeDiff);
+    if (timeDiff <= 0) return;
+
+    console.log('Time difference (s):', timeDiff);
+
+    let gpsSpeed = currentLocation.speed; // m/s (hardware)
+    let speedNow = 0;
+
+    //calculate distance-based speed
+    const rawDistance = calculateDistance(previousLocation.latitude,
+      previousLocation.longitude,
+      currentLocation.latitude,
+      currentLocation.longitude);
+    const calculatedRawSpeed = rawDistance / timeDiff;
+    console.log('distance calculated:', rawDistance);
+    setCalculatedSpeed(calculatedRawSpeed);
+
+    // Use GPS hardware speed when valid
+    if (gpsSpeed != null && gpsSpeed >= 0 && gpsSpeed < 100) {
+      speedNow = gpsSpeed;
+    } else {
+      // fallback to distance-based speed
+      speedNow = calculatedRawSpeed;
+    }
+
+    // Low-pass filter to smooth noisy jumps
+    const smoothSpeed = prevSpeedRef.current * 0.4 + speedNow * 0.6;
+
+    // Calculate acceleration
+    const acc = (smoothSpeed - prevSpeedRef.current) / timeDiff;
+
+    prevSpeedRef.current = smoothSpeed;
+
+    setSpeed(smoothSpeed);
+    setAcceleration(acc);
+
+
   }, [currentLocation]);
+
   const getCurrentLocation = async () => {
     if (requestingRef.current) return;
     requestingRef.current = true;
-    console.log('function called');
+
     try {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.check(
@@ -52,9 +85,8 @@ function App() {
           const permissionResult = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
           );
-
           if (permissionResult !== PermissionsAndroid.RESULTS.GRANTED) {
-            Alert.alert('Permission denied', 'Location permission is required.');
+            Alert.alert("Permission denied", "Location permission is required.");
             return;
           }
         }
@@ -62,100 +94,120 @@ function App() {
 
       const location = await GetLocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 60000,
+        timeout: 8000,
       });
+
+      if (location.accuracy) {
+        setCurrentAccuracy(location.accuracy);
+      }
+
+      if (location.altitude) {
+        setAltitude(location.altitude);
+      }
+      // Filter bad GPS accuracy
+      if (location.accuracy && location.accuracy > 15) {
+        console.log("Skipping bad-accuracy reading:", location.accuracy);
+        return;
+      }
+      setPreviousLocation(currentLocation);
       setCurrentLocation(location);
-
-
     } catch (error) {
       if (isLocationError(error)) {
-        console.warn('Location error', error.code, error.message);
+        console.warn("Location error", error.code, error.message);
       }
-    }
-    finally {
+    } finally {
       requestingRef.current = false;
     }
   };
 
-  const toRedian = (degree: number) => {
-    return degree * (Math.PI / 180);
-  };
+  const toRadians = (deg: number) => deg * (Math.PI / 180);
 
-  const calculateDistannce = (lat1, lon1, lat2, lon2) => {
-    const Radious = 6371000;
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000; // m
     lat1 = Number(lat1.toFixed(5));
     lon1 = Number(lon1.toFixed(5));
     lat2 = Number(lat2.toFixed(5));
     lon2 = Number(lon2.toFixed(5));
-    const dLat = toRedian(lat2 - lat1);
-    const dLon = toRedian(lon2 - lon1);
 
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRedian(lat1)) * Math.cos(toRedian(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = Radious * c;
-    return distance; // distance in meters
-  }
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  };
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       <View style={styles.container}>
-        <Text style={styles.textStyle}>Gps</Text>
+        <Text style={styles.textStyle}>GPS</Text>
+
         <View style={styles.coordinateStyle}>
-          <Text> Cureent location </Text>
+          <Text style={styles.SubHeaderTextStyle}>Current Location</Text>
           {currentLocation ? (
             <Text style={styles.textStyle}>{`Lat: ${currentLocation.latitude}\nLon: ${currentLocation.longitude}`}</Text>
-          ) : (
-            <Text style={styles.textStyle}>No location</Text>
-          )}
+          ) : <Text style={styles.textStyle}>No location</Text>}
         </View>
-        <View style={styles.coordinateStyle}>
-          <Text> Previous Location </Text>
-          {previousLocation ? (
-            <Text style={styles.textStyle}>{`Lat: ${previousLocation.latitude}\nLon: ${previousLocation.longitude}`}</Text>
-          ) : (
-            <Text style={styles.textStyle}>No location</Text>
-          )}
-        </View>
-        <View style={styles.coordinateStyle}>
-          <Text> Altitude </Text>
-          {currentLocation ? (<Text style={styles.textStyle}>{currentLocation.altitude.toFixed(1)}</Text>) : null}
-        </View>
-        <View style={styles.coordinateStyle}>
-          <Text> Speed </Text>
-          {speed ? (
+
+        <View>
+          <View style={styles.coordinateStyle}>
+            <Text style={styles.SubHeaderTextStyle}>Speed (km/h)</Text>
             <Text style={styles.textStyle}>{(speed * 3.6).toFixed(2)}</Text>
-          ) : (
-            <Text style={styles.textStyle}>{'inProgress'}</Text>
-          )}
-          <Text> Acceleration </Text>
-          {
-            acceleration ? (
-              <Text style={styles.textStyle}>{acceleration.toFixed(1)}</Text>)
-              :
-              <Text style={styles.textStyle}>{0}</Text>
-          }
+          </View>
+          <View style={styles.coordinateStyle}>
+            <Text style={styles.SubHeaderTextStyle}>Calculated Speed (km/h)</Text>
+            <Text style={styles.textStyle}>{(calculatedSpeed * 3.6).toFixed(2)}</Text>
+          </View>
+        </View>
+
+
+        <View style={styles.coordinateStyle}>
+          <Text style={styles.SubHeaderTextStyle}>Acceleration (m/s²)</Text>
+          <Text style={styles.textStyle}>{acceleration.toFixed(2)}</Text>
+        </View>
+
+        <View style={styles.coordinateStyle}>
+          <Text style={styles.SubHeaderTextStyle}>Accuracy (m - radius)</Text>
+          {currentAccuracy ? (
+            <Text style={styles.textStyle}>{currentAccuracy.toFixed(1)}</Text>) : (
+            <Text style={styles.textStyle}>--</Text>)}
+        </View>
+
+        <View style={styles.coordinateStyle}>
+          <Text style={styles.SubHeaderTextStyle}>Altitude (m)</Text>
+          {altitude ? (
+            <Text style={styles.textStyle}>{altitude.toFixed(1)}</Text>) :
+            (<Text style={styles.textStyle}>--</Text>)}
         </View>
       </View>
     </SafeAreaProvider>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
   },
   textStyle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 22,
   },
   coordinateStyle: {
-
+    marginVertical: 20,
+    color: "#fff",
+    alignItems: "center",
+  },
+  SubHeaderTextStyle: {
+    color: "#fff",
+    fontSize: 18,
   },
 });
 
