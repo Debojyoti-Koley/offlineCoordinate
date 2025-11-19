@@ -1,19 +1,30 @@
-import { StatusBar, StyleSheet, useColorScheme, View, Text, Platform, PermissionsAndroid, Alert } from 'react-native';
+import {
+  StatusBar,
+  StyleSheet,
+  useColorScheme,
+  View,
+  Text,
+  Platform,
+  PermissionsAndroid,
+  Alert,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import React, { useState, useEffect, useRef } from 'react';
 import GetLocation, { Location, isLocationError } from 'react-native-get-location';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
+
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
-  const [previousLocation, setPreviousLocation] = useState<Location | null>(null);
-  const [speed, setSpeed] = useState<number>(0);              // m/s
+  const [speed, setSpeed] = useState<number>(0); // m/s
   const [acceleration, setAcceleration] = useState<number>(0); // m/s²
   const [altitude, setAltitude] = useState<number | null>(null);
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
   const [calculatedSpeed, setCalculatedSpeed] = useState<number>(0); // m/s
+
   const requestingRef = useRef(false);
   const prevSpeedRef = useRef(0);
+  const prevLocationRef = useRef<Location | null>(null);
 
   useEffect(() => {
     getCurrentLocation();
@@ -23,28 +34,33 @@ function App() {
 
   useEffect(() => {
     console.log('New location received');
-    if (!currentLocation) {
+    const current = currentLocation;
+    const previous = prevLocationRef.current;
+
+    if (!current) {
       console.log('Current location is null');
     }
-    if (!previousLocation) {
+    if (!previous) {
       console.log('Previous location is null');
     }
-    if (!currentLocation || !previousLocation) return;
+    if (!current || !previous) return;
 
-    const timeDiff = (currentLocation.time - previousLocation.time) / 1000;
+    const timeDiff = (current.time - previous.time) / 1000;
     console.log('prevtime diff:', timeDiff);
     if (timeDiff <= 0) return;
 
     console.log('Time difference (s):', timeDiff);
 
-    let gpsSpeed = currentLocation.speed; // m/s (hardware)
+    const gpsSpeed = current.speed; // m/s (hardware)
     let speedNow = 0;
 
-    //calculate distance-based speed
-    const rawDistance = calculateDistance(previousLocation.latitude,
-      previousLocation.longitude,
-      currentLocation.latitude,
-      currentLocation.longitude);
+    // calculate distance-based speed
+    const rawDistance = calculateDistance(
+      previous.latitude,
+      previous.longitude,
+      current.latitude,
+      current.longitude
+    );
     const calculatedRawSpeed = rawDistance / timeDiff;
     console.log('distance calculated:', rawDistance);
     setCalculatedSpeed(calculatedRawSpeed);
@@ -67,8 +83,6 @@ function App() {
 
     setSpeed(smoothSpeed);
     setAcceleration(acc);
-
-
   }, [currentLocation]);
 
   const getCurrentLocation = async () => {
@@ -86,7 +100,7 @@ function App() {
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
           );
           if (permissionResult !== PermissionsAndroid.RESULTS.GRANTED) {
-            Alert.alert("Permission denied", "Location permission is required.");
+            Alert.alert('Permission denied', 'Location permission is required.');
             return;
           }
         }
@@ -97,23 +111,29 @@ function App() {
         timeout: 8000,
       });
 
-      if (location.accuracy) {
+      if (location.accuracy != null) {
         setCurrentAccuracy(location.accuracy);
       }
 
-      if (location.altitude) {
+      if (location.altitude != null) {
         setAltitude(location.altitude);
       }
+
       // Filter bad GPS accuracy
-      if (location.accuracy && location.accuracy > 15) {
-        console.log("Skipping bad-accuracy reading:", location.accuracy);
+      if (location.accuracy != null && location.accuracy > 15) {
+        console.log('Skipping bad-accuracy reading:', location.accuracy);
         return;
       }
-      setPreviousLocation(currentLocation);
+
+      // update previous location ref with last good currentLocation
+      if (currentLocation) {
+        prevLocationRef.current = currentLocation;
+      }
+
       setCurrentLocation(location);
     } catch (error) {
       if (isLocationError(error)) {
-        console.warn("Location error", error.code, error.message);
+        console.warn('Location error', error.code, error.message);
       }
     } finally {
       requestingRef.current = false;
@@ -122,8 +142,9 @@ function App() {
 
   const toRadians = (deg: number) => deg * (Math.PI / 180);
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371000; // m
+
     lat1 = Number(lat1.toFixed(5));
     lon1 = Number(lon1.toFixed(5));
     lat2 = Number(lat2.toFixed(5));
@@ -143,7 +164,7 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.container}>
         <Text style={styles.textStyle}>GPS</Text>
 
@@ -151,7 +172,9 @@ function App() {
           <Text style={styles.SubHeaderTextStyle}>Current Location</Text>
           {currentLocation ? (
             <Text style={styles.textStyle}>{`Lat: ${currentLocation.latitude}\nLon: ${currentLocation.longitude}`}</Text>
-          ) : <Text style={styles.textStyle}>No location</Text>}
+          ) : (
+            <Text style={styles.textStyle}>No location</Text>
+          )}
         </View>
 
         <View>
@@ -165,7 +188,6 @@ function App() {
           </View>
         </View>
 
-
         <View style={styles.coordinateStyle}>
           <Text style={styles.SubHeaderTextStyle}>Acceleration (m/s²)</Text>
           <Text style={styles.textStyle}>{acceleration.toFixed(2)}</Text>
@@ -173,16 +195,20 @@ function App() {
 
         <View style={styles.coordinateStyle}>
           <Text style={styles.SubHeaderTextStyle}>Accuracy (m - radius)</Text>
-          {currentAccuracy ? (
-            <Text style={styles.textStyle}>{currentAccuracy.toFixed(1)}</Text>) : (
-            <Text style={styles.textStyle}>--</Text>)}
+          {currentAccuracy != null ? (
+            <Text style={styles.textStyle}>{currentAccuracy.toFixed(1)}</Text>
+          ) : (
+            <Text style={styles.textStyle}>--</Text>
+          )}
         </View>
 
         <View style={styles.coordinateStyle}>
           <Text style={styles.SubHeaderTextStyle}>Altitude (m)</Text>
-          {altitude ? (
-            <Text style={styles.textStyle}>{altitude.toFixed(1)}</Text>) :
-            (<Text style={styles.textStyle}>--</Text>)}
+          {altitude != null ? (
+            <Text style={styles.textStyle}>{altitude.toFixed(1)}</Text>
+          ) : (
+            <Text style={styles.textStyle}>--</Text>
+          )}
         </View>
       </View>
     </SafeAreaProvider>
@@ -192,21 +218,21 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
   },
   textStyle: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 22,
   },
   coordinateStyle: {
     marginVertical: 20,
-    color: "#fff",
-    alignItems: "center",
+    color: '#fff',
+    alignItems: 'center',
   },
   SubHeaderTextStyle: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 18,
   },
 });
