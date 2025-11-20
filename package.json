@@ -14,7 +14,8 @@
     "react": "19.1.1",
     "react-native": "0.82.1",
     "react-native-get-location": "^6.0.0",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "toggle-switch-react-native": "^3.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
