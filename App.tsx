@@ -7,6 +7,7 @@ import {
   Platform,
   PermissionsAndroid,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import React, { useState, useEffect, useRef } from 'react';
@@ -22,6 +23,8 @@ function App() {
   const [altitude, setAltitude] = useState<number | null>(null);
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
   const [calculatedSpeed, setCalculatedSpeed] = useState<number>(0); // m/s
+  const [maxSpeed, setMaxSpeed] = useState<number>(0); // m/s
+  const [maxCalculatedSpeed, setMaxCalculatedSpeed] = useState<number>(0); // m/s
 
   // toggle values
   const [toggle, setToggle] = useState<boolean>(false);
@@ -81,6 +84,7 @@ function App() {
     );
     const calculatedRawSpeed = rawDistance / timeDiff;
     setCalculatedSpeed(calculatedRawSpeed);
+    setMaxCalculatedSpeed(prevMax => (calculatedRawSpeed > prevMax ? calculatedRawSpeed : prevMax));
 
     if (gpsSpeed != null && gpsSpeed >= 0 && gpsSpeed < 100) {
       speedNow = gpsSpeed;
@@ -98,6 +102,7 @@ function App() {
     prevLocationRef.current = current;
 
     setSpeed(smoothSpeed);
+    setMaxSpeed(prevMax => (smoothSpeed > prevMax ? smoothSpeed : prevMax));
     setAcceleration(acc);
   }, [currentLocation, toggle]);
 
@@ -170,12 +175,14 @@ function App() {
             const cSpeed = distance / timeDiff; // m/s
             console.log('Toggle ON: pairwise distance', distance, 'timeDiff', timeDiff, 'speed m/s', cSpeed);
             setCalculatedSpeed(cSpeed);
+            setMaxCalculatedSpeed(prevMax => (cSpeed > prevMax ? cSpeed : prevMax));
             // update last sample to this one for next interval comparison
             lastSampleRef.current = location;
           } else {
             // suspicious timestamps — replace last sample
             lastSampleRef.current = location;
             setCalculatedSpeed(0);
+            setMaxCalculatedSpeed(prevMax => (0 > prevMax ? 0 : prevMax));
           }
         }
         // In toggle mode we do not update continuous-mode prevLocationRef here.
@@ -234,10 +241,15 @@ function App() {
     return fixedNum;
   };
 
+  function handleReset() {
+    setMaxSpeed(0);
+    setMaxCalculatedSpeed(0);
+  }
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.textStyle}>GPS</Text>
         <View style={styles.toggleStyle}>
           <ToggleSwitch
@@ -260,6 +272,10 @@ function App() {
           />
         </View>
 
+        <View style={styles.resetContainer}>
+          <Text style={styles.resetText} onPress={handleReset}>Reset</Text>
+        </View>
+
         <View style={styles.coordinateStyle}>
           <Text style={styles.SubHeaderTextStyle}>Current Location</Text>
           {currentLocation ? (
@@ -274,12 +290,23 @@ function App() {
             <Text style={styles.SubHeaderTextStyle}>Speed</Text>
             <Text style={styles.speedValue}>{(speed * 3.6).toFixed(2)}</Text>
             <Text style={styles.speedUnit}>km/h</Text>
+            <View style={styles.maxSpeedBox}>
+              <Text style={styles.maxLabel}>Max</Text>
+              <Text style={styles.maxValue}>{(maxSpeed * 3.6).toFixed(2)}</Text>
+              <Text style={styles.maxUnit}>km/h</Text>
+            </View>
           </View>
           <View style={styles.coordinateStyle}>
             <Text style={styles.SubHeaderTextStyle}>Calculated Speed</Text>
             <Text style={styles.speedValue}>{Math.floor(calculatedSpeed * 3.6)}</Text>
             <Text style={styles.speedUnit}>km/h</Text>
+            <View style={styles.maxSpeedBox}>
+              <Text style={styles.maxLabel}>Max</Text>
+              <Text style={styles.maxValue}>{Math.floor(maxCalculatedSpeed * 3.6)}</Text>
+              <Text style={styles.maxUnit}>km/h</Text>
+            </View>
           </View>
+
         </View>
 
         <View style={styles.coordinateStyle}>
@@ -304,16 +331,17 @@ function App() {
             <Text style={styles.textStyle}>--</Text>
           )}
         </View>
-      </View>
-    </SafeAreaProvider>
+      </ScrollView>
+    </SafeAreaProvider >
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 40,
     backgroundColor: '#000',
   },
   textStyle: {
@@ -367,6 +395,57 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
+  maxSpeedBox: {
+    marginTop: 8,
+    backgroundColor: '#222',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  maxLabel: {
+    color: '#0ea5e9',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 4,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  maxValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 2,
+    letterSpacing: 1,
+  },
+  maxUnit: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  resetContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 20,
+    height: 40,
+    width: 80,
+    backgroundColor: '#444',
+  },
+  resetText: {
+    color: '#fff',
+    fontSize: 16,
+  }
 });
 
 export default App;
