@@ -244,8 +244,8 @@ function App() {
             isOn={toggle}
             onColor="green"
             offColor="red"
-            label="Example label"
-            labelStyle={{ color: '#fff',fontSize: 22,  fontWeight: '600' }}
+            label="lenient mode"
+            labelStyle={{ color: '#fff', fontSize: 22, fontWeight: '600' }}
             size="large"
             onToggle={() => {
               // Reset sampling state when toggling
@@ -269,14 +269,16 @@ function App() {
           )}
         </View>
 
-        <View>
+        <View style={styles.speedContainer}>
           <View style={styles.coordinateStyle}>
-            <Text style={styles.SubHeaderTextStyle}>Speed (km/h)</Text>
-            <Text style={styles.textStyle}>{(speed * 3.6).toFixed(2)}</Text>
+            <Text style={styles.SubHeaderTextStyle}>Speed</Text>
+            <Text style={styles.speedValue}>{(speed * 3.6).toFixed(2)}</Text>
+            <Text style={styles.speedUnit}>km/h</Text>
           </View>
           <View style={styles.coordinateStyle}>
-            <Text style={styles.SubHeaderTextStyle}>Calculated Speed (km/h)</Text>
-            <Text style={styles.textStyle}>{Math.floor(calculatedSpeed * 3.6)}</Text>
+            <Text style={styles.SubHeaderTextStyle}>Calculated Speed</Text>
+            <Text style={styles.speedValue}>{Math.floor(calculatedSpeed * 3.6)}</Text>
+            <Text style={styles.speedUnit}>km/h</Text>
           </View>
         </View>
 
@@ -337,6 +339,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     width: '50%',
+  },
+  speedContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    width: '90%',
+    gap: 16,
+    marginVertical: 12,
+  },
+  speedValue: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 0,
+    letterSpacing: 1,
+  },
+  speedUnit: {
+    color: '#94a3b8',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 0,
+    marginBottom: 2,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });
 
