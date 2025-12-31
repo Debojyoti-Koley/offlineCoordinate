@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import React, { useState, useEffect, useRef } from 'react';
 import GetLocation, { Location, isLocationError } from 'react-native-get-location';
 import ToggleSwitch from 'toggle-switch-react-native';
+import { useKeepAwake } from '@sayem314/react-native-keep-awake';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -33,6 +34,8 @@ function App() {
   const prevSpeedRef = useRef(0); // used for smoothing in continuous mode
   const prevLocationRef = useRef<Location | null>(null); // used for continuous mode
   const lastSampleRef = useRef<Location | null>(null); // used for pairwise (toggle ON) sampling
+
+  useKeepAwake();
 
   useEffect(() => {
     // when toggle changes we want to reset sampling state for pairwise mode
@@ -250,142 +253,199 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.textStyle}>GPS</Text>
-        <View style={styles.toggleStyle}>
-          <ToggleSwitch
-            isOn={toggle}
-            onColor="green"
-            offColor="red"
-            label="lenient mode"
-            labelStyle={{ color: '#fff', fontSize: 22, fontWeight: '600' }}
-            size="large"
-            onToggle={() => {
-              // Reset sampling state when toggling
-              lastSampleRef.current = null;
-              prevLocationRef.current = null;
-              prevSpeedRef.current = 0;
-              setCalculatedSpeed(0);
-              setSpeed(0);
-              setAcceleration(0);
-              setToggle(prev => !prev);
-            }}
-          />
+        {/* Top Bar */}
+        <View style={styles.topBar}>
+          <Text style={styles.topBarTitle}>GPS dashboard</Text>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>
+              {/* {currentAccuracy != null ? `Connected • ${currentAccuracy.toFixed(1)} m accuracy` : 'Connecting...'} */}
+              Connected
+            </Text>
+          </View>
         </View>
 
+        {/* Card: Toggle */}
+        <View style={styles.card}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.cardTitle}>Lenient GPS mode</Text>
+            <ToggleSwitch
+              isOn={toggle}
+              onColor="#22d3ee"
+              offColor="#334155"
+              size="medium"
+              onToggle={() => {
+                lastSampleRef.current = null;
+                prevLocationRef.current = null;
+                prevSpeedRef.current = 0;
+                setCalculatedSpeed(0);
+                setSpeed(0);
+                setAcceleration(0);
+                setToggle(prev => !prev);
+              }}
+            />
+          </View>
+          <Text style={styles.cardDescription}>
+            Optimizes location updates for smoother tracking
+          </Text>
+        </View>
+
+        {/* Card: Location */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Location</Text>
+          {currentLocation ? (
+            <View>
+              <Text style={styles.locationTextLat}>{`Lat: ${currentLocation.latitude}`}</Text>
+              <Text style={styles.locationTextLon}>{`Lon: ${currentLocation.longitude}`}</Text>
+            </View>
+          ) : (
+            <Text style={styles.locationTextLat}>No location</Text>
+          )}
+        </View>
+
+        {/* Card: Speed */}
+        <View style={[styles.card, styles.speedCardRow]}>
+          <View style={styles.speedCardCol}>
+            <Text style={styles.cardTitle}>Speed</Text>
+            <Text style={styles.metricValue}>{(speed * 3.6).toFixed(2)}</Text>
+            <Text style={styles.metricUnit}>km/h</Text>
+            <Text style={styles.metricMax}>Max: {(maxSpeed * 3.6).toFixed(2)} km/h</Text>
+          </View>
+          <View style={styles.speedCardCol}>
+            <Text style={[styles.cardTitle, styles.speedCardCalculatedSpeed]}>Calculated Speed</Text>
+            <Text style={styles.metricValue}>{(calculatedSpeed * 3.6).toFixed(2)}</Text>
+            <Text style={styles.metricUnit}>km/h</Text>
+            <Text style={styles.metricMax}>Max: {(maxCalculatedSpeed * 3.6).toFixed(2)} km/h</Text>
+          </View>
+        </View>
+
+        {/* Card: Motion */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Motion</Text>
+          <Text style={styles.motionRow}>
+            Acceleration: <Text style={styles.motionValue}>{acceleration.toFixed(2)}</Text> m/s²
+          </Text>
+          <Text style={styles.motionRow}>
+            Accuracy: <Text style={styles.motionValue}>{currentAccuracy != null ? currentAccuracy.toFixed(1) : '--'}</Text> m radius
+          </Text>
+        </View>
+
+        {/* Reset Button */}
         <View style={styles.resetContainer}>
           <Text style={styles.resetText} onPress={handleReset}>Reset</Text>
         </View>
-
-        <View style={styles.coordinateStyle}>
-          <Text style={styles.SubHeaderTextStyle}>Current Location</Text>
-          {currentLocation ? (
-            <Text style={styles.textStyle}>{`Lat: ${currentLocation.latitude}\nLon: ${currentLocation.longitude}`}</Text>
-          ) : (
-            <Text style={styles.textStyle}>No location</Text>
-          )}
-        </View>
-
-        <View style={styles.speedContainer}>
-          <View style={styles.coordinateStyle}>
-            <Text style={styles.SubHeaderTextStyle}>Speed</Text>
-            <Text style={styles.speedValue}>{(speed * 3.6).toFixed(2)}</Text>
-            <Text style={styles.speedUnit}>km/h</Text>
-            <View style={styles.maxSpeedBox}>
-              <Text style={styles.maxLabel}>Max</Text>
-              <Text style={styles.maxValue}>{(maxSpeed * 3.6).toFixed(2)}</Text>
-              <Text style={styles.maxUnit}>km/h</Text>
-            </View>
-          </View>
-          <View style={styles.coordinateStyle}>
-            <Text style={styles.SubHeaderTextStyle}>Calculated Speed</Text>
-            <Text style={styles.speedValue}>{Math.floor(calculatedSpeed * 3.6)}</Text>
-            <Text style={styles.speedUnit}>km/h</Text>
-            <View style={styles.maxSpeedBox}>
-              <Text style={styles.maxLabel}>Max</Text>
-              <Text style={styles.maxValue}>{Math.floor(maxCalculatedSpeed * 3.6)}</Text>
-              <Text style={styles.maxUnit}>km/h</Text>
-            </View>
-          </View>
-
-        </View>
-
-        <View style={styles.coordinateStyle}>
-          <Text style={styles.SubHeaderTextStyle}>Acceleration (m/s²)</Text>
-          <Text style={styles.textStyle}>{acceleration.toFixed(2)}</Text>
-        </View>
-
-        <View style={styles.coordinateStyle}>
-          <Text style={styles.SubHeaderTextStyle}>Accuracy (m - radius)</Text>
-          {currentAccuracy != null ? (
-            <Text style={styles.textStyle}>{currentAccuracy.toFixed(1)}</Text>
-          ) : (
-            <Text style={styles.textStyle}>--</Text>
-          )}
-        </View>
-
-        <View style={styles.coordinateStyle}>
-          <Text style={styles.SubHeaderTextStyle}>Altitude (m)</Text>
-          {altitude != null ? (
-            <Text style={styles.textStyle}>{altitude.toFixed(1)}</Text>
-          ) : (
-            <Text style={styles.textStyle}>--</Text>
-          )}
-        </View>
       </ScrollView>
-    </SafeAreaProvider >
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: '#000',
+    paddingVertical: 24,
+    paddingHorizontal: 0,
+    backgroundColor: '#23272f',
+    minHeight: '100%',
   },
-  textStyle: {
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+    paddingHorizontal: 25,
+    paddingTop: 35,
+  },
+  topBarTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    paddingRight: 5,
+  },
+  statusBadge: {
+    backgroundColor: '#71EECE',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadgeText: {
+    color: '#0a0a0aff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  card: {
+    backgroundColor: '#2d323c',
+    borderRadius: 16,
+    padding: 18,
+    marginHorizontal: 18,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardTitle: {
     color: '#fff',
     fontSize: 22,
+    fontWeight: '500',
+    marginBottom: 6,
   },
-  coordinateStyle: {
-    marginVertical: 20,
-    color: '#fff',
+  cardDescription: {
+    color: '#94a3b8',
+    fontSize: 14,
+    marginTop: 2,
+    fontWeight: '400',
+  },
+  toggleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
   },
-  SubHeaderTextStyle: {
+  locationTextLat: {
     color: '#fff',
     fontSize: 18,
+    marginTop: 5,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginBottom: 3,
   },
-  toggle: {
+  locationTextLon: {
     color: '#fff',
-    fontSize: 22,
-    margin: 0,
+    fontSize: 18,
+    marginTop: 2,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginBottom: 6,
   },
-  toggleStyle: {
+  speedCardRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    width: '50%',
-  },
-  speedContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'stretch',
-    width: '90%',
     gap: 16,
-    marginVertical: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
   },
-  speedValue: {
-    color: '#fff',
-    fontSize: 32,
+  speedCardCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  speedCardCalculatedSpeed: {
+    fontSize: 20,
+  },
+  metricValue: {
+    color: '#22d3ee',
+    fontSize: 42,
     fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 2,
     marginBottom: 0,
     letterSpacing: 1,
   },
-  speedUnit: {
+  metricUnit: {
     color: '#94a3b8',
     fontSize: 16,
     fontWeight: '600',
@@ -395,57 +455,40 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  maxSpeedBox: {
-    marginTop: 8,
-    backgroundColor: '#222',
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  maxLabel: {
-    color: '#0ea5e9',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginRight: 4,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  maxValue: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 2,
-    letterSpacing: 1,
-  },
-  maxUnit: {
+  metricMax: {
     color: '#94a3b8',
     fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontWeight: '500',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  motionRow: {
+    color: '#94a3b8',
+    fontSize: 18,
+    marginTop: 2,
+    fontWeight: '400',
+  },
+  motionValue: {
+    color: '#22d3ee',
+    fontWeight: '700',
+    fontSize: 18,
   },
   resetContainer: {
-    display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
-    margin: 20,
-    height: 40,
-    width: 80,
-    backgroundColor: '#444',
+    marginTop: 8,
+    marginBottom: 24,
   },
   resetText: {
     color: '#fff',
     fontSize: 16,
-  }
+    backgroundColor: '#334155',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
 });
 
 export default App;

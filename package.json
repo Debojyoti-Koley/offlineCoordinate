@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@react-native/new-app-screen": "0.82.1",
+    "@sayem314/react-native-keep-awake": "^1.4.0",
     "react": "19.1.1",
     "react-native": "0.82.1",
     "react-native-get-location": "^6.0.0",
