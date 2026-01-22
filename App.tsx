@@ -1,3 +1,18 @@
+// Helper to get accuracy color
+const getAccuracyColor = (accuracy: number | null) => {
+  if (accuracy == null) return '#94a3b8';
+  if (accuracy < 4) return '#22c55e'; // green
+  if (accuracy < 10) return '#eab308'; // yellow
+  return '#ef4444'; // red
+};
+
+// Helper to get accuracy label
+const getAccuracyLabel = (accuracy: number | null) => {
+  if (accuracy == null) return '';
+  if (accuracy < 4) return 'Good accuracy';
+  if (accuracy < 10) return 'Average accuracy';
+  return 'Poor accuracy';
+};
 import {
   StatusBar,
   StyleSheet,
@@ -325,7 +340,21 @@ function App() {
             Acceleration: <Text style={styles.motionValue}>{acceleration.toFixed(2)}</Text> m/s²
           </Text>
           <Text style={styles.motionRow}>
-            Accuracy: <Text style={styles.motionValue}>{currentAccuracy != null ? currentAccuracy.toFixed(1) : '--'}</Text> m radius
+            Accuracy:
+            <Text
+              style={[
+                styles.motionValue,
+                { color: getAccuracyColor(currentAccuracy) },
+              ]}
+            >
+              {currentAccuracy != null ? ' ' + currentAccuracy.toFixed(1) + ' m radius' : '--'}
+            </Text>
+
+            {currentAccuracy != null && (
+              <Text style={{ color: getAccuracyColor(currentAccuracy), fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
+                {' '}- {getAccuracyLabel(currentAccuracy)}
+              </Text>
+            )}
           </Text>
         </View>
 
